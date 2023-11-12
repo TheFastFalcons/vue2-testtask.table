@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Country Table</title>
+    <script src="https://cdn.jsdelivr.net/npm/vue@2"></script>
+    <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+        }
+
+        table {
+            min-width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 1em;
+            table-layout: fixed;
+        }
+
+        th,
+        td {
+            width: 20%;
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+            word-wrap: break-word;
+        }
+
+        th {
+            background-color: #4CAF50;
+            color: white;
+        }
+
+        button {
+            background-color: #4CAF50;
+            border: none;
+            color: white;
+            padding: 10px 20px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 16px;
+            margin: 4px 2px;
+            cursor: pointer;
+        }
+
+        button:disabled {
+            background-color: #ddd;
+            cursor: not-allowed;
+        }
+
+        input { 
+            margin-bottom: 10px;
+            padding: 6px 10px;
+        }
+
+        @media (max-width: 600px) {
+            table {
+                width: 100%;
+            }
+
+            th,
+            td {
+            width: auto;  
+        }
+        }
+    </style>
+</head>
+
+<body>
+
+
+    <div id="app">
+        <countries-table 
+        :data="countries" 
+        :page-data="pageData" 
+        :filter="filter" 
+        @filter-changed="applyFilter"
+        @next-page="nextPage" @prev-page="prevPage">
+        </countries-table>
+    </div>
+
+    <template id="countries-table-template">
+        <div>
+            <p>Page {{ pageData.current_page }} of {{ pageData.total_pages }} ({{ pageData.total_count }} items total)
+            </p>
+            <input type="text" v-model="filter" @input="filterChanged" placeholder="Фильтр">
+            <table>
+                <thead>
+                    <tr>
+                        <th>ISO 3166-1 A2</th>
+                        <th>ISO 3166-1 A3</th>
+                        <th>ISO 3166-1 Numeric</th>
+                        <th>Printable Name</th>
+                        <th>Is Shipping Country</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr v-for="country in data">
+                        <td>{{ country.iso_3166_1_a2 }}</td>
+                        <td>{{ country.iso_3166_1_a3 }}</td>
+                        <td>{{ country.iso_3166_1_numeric }}</td>
+                        <td>{{ country.printable_name }}</td>
+                        <td>{{ country.is_shipping_country }}</td>
+                        <td :style="{background: country.is_shipping_country ? 'lime' : 'red'}">{{
+                            country.is_shipping_country }}</td>
+                    </tr>
+                </tbody>
+            </table>
+            <button @click="prevPage" :disabled="pageData.current_page === 1">
+                Previous
+            </button>
+            <button @click="nextPage" :disabled="pageData.current_page === pageData.total_pages">
+                Next
+            </button>
+        </div>
+    </template>
+    <script>
+        Vue.component('countries-table', {
+            template: '#countries-table-template',
+            props: ['data', 'pageData', 'filter'],
+            methods: {
+                nextPage() {
+                    if (this.pageData.current_page < this.pageData.total_pages) {
+                        this.$emit('next-page');
+                    }
+                },
+                prevPage() {
+                    if (this.pageData.current_page > 1) {
+                        this.$emit('prev-page');
+                    }
+                },
+                filterChanged() {
+                    this.$emit('filter-changed', this.filter);
+                }
+            }
+        });
+
+        new Vue({
+            el: '#app',
+            data: {
+                countries: [],
+                pageData: {
+                    current_page: 1,
+                    total_pages: 1,
+                    total_count: 0,
+                },
+                filter: '',
+            },
+            created() {
+                this.fetchData();
+            },
+            methods: {
+                fetchData(page = 1) {
+                    axios.post('https://devops100.site/test/', {
+                        filters: { iso_3166_1_a2: this.filter },
+                        paginate: { page: page, pp_items: 10 }
+                    }).then((response) => {
+                        if (response.data.success_message === "Success" && response.data.page_data) {
+                            this.countries = response.data.page_data.data;
+                            const { total_count } = response.data.page_data.rpag;
+
+                            this.pageData = {
+                            current_page: page,
+                            total_pages: total_count ? Math.ceil(total_count / 10) : this.pageData.total_pages,
+                            total_count: total_count || this.pageData.total_count
+                        };
+                        }
+                    }).catch(error => {
+                    });
+                },
+                nextPage() {
+                    this.fetchData(this.pageData.current_page + 1);
+                },
+                prevPage() {
+                    this.fetchData(this.pageData.current_page - 1);
+                },
+                applyFilter(newFilter) {
+                    this.filter = newFilter;
+                    this.fetchData(1);
+                }
+            }
+        });
+    </script>
+</body>
+
+</html>
